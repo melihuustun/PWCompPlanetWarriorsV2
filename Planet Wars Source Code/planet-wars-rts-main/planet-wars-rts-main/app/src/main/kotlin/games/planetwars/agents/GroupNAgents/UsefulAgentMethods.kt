@@ -32,9 +32,8 @@ class UsefulAgentMethods {
     }
     //Same as before for enemy transporters.
     fun enemyTransporterTravellingTotal(planet: Planet, enemyPlanets: List<Planet>): Int {
-        return enemyPlanets.count {p -> p.transporter?.destinationIndex == planet.id}
+        return enemyPlanets.count{p -> p.transporter?.destinationIndex == planet.id}
     }
-
     //Returns a list of the enemy planets who have sent transporters to the planet we input.
     fun enemyTransporterTravellingFrom(planet: Planet, enemyPlanets: List<Planet>): List<Planet> {
         return enemyPlanets.filter {p -> p.transporter?.destinationIndex == planet.id}
@@ -45,6 +44,15 @@ class UsefulAgentMethods {
     // in the {}.
     fun enemyTransporterWeight(enemyTransporterPlanets: List<Planet>): List<Double?> {
         return enemyTransporterPlanets.map{it.transporter?.nShips}
+    }
+
+    //Take list of enemy planets who have sent transporters, return the total weight of transporters
+    //Targetting the original planet (or whatever the list is conveying).
+    // sumOf will sum each element in the list according to the function {}.
+    // we call it.transporter? as required since transporter is nullable and ? checks for null values.
+    // we then take the nships to be added to the sum. ?: 0.0 means that for each null value, we replace it with 0.0.
+    fun enemyTransporterTotalWeight(enemyTransporterPlanets: List<Planet>): Double{
+        return enemyTransporterPlanets.sumOf{it.transporter?.nShips ?: 0.0}
     }
 
     //Collect list of enemy planets in the current game tick.
