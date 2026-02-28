@@ -10,7 +10,7 @@ import games.planetwars.core.*
 import games.planetwars.core.ForwardModel.*
 import games.planetwars.core.GameParams.*
 
-class UsefulAgentMethods {
+/* class UsefulAgentMethods {
 
     // Method takes a target planet and the list of player's owned planets, check if
     // any planet in list has sent a transporter to the target planet, return true/false.7
@@ -94,4 +94,4 @@ class UsefulAgentMethods {
         return time
 
     }
-}
+} */
