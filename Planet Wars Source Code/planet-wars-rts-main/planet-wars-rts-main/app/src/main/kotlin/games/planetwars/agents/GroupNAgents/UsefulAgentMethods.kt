@@ -2,11 +2,13 @@ package games.planetwars.agents.GroupNAgents
 
 import games.planetwars.core.Planet
 import games.planetwars.agents.Action.*
+import games.planetwars.agents.PlanetWarsAgent
 import games.planetwars.agents.PlanetWarsPlayer
 import games.planetwars.agents.PlanetWarsPlayer.*
 import games.planetwars.core.GameState.*
 import games.planetwars.core.*
 import games.planetwars.core.ForwardModel.*
+import games.planetwars.core.GameParams.*
 
 class UsefulAgentMethods {
 
@@ -66,5 +68,30 @@ class UsefulAgentMethods {
             return (amount*-1)+1
         }
         return 0.0
+    }
+
+    // Returns the time until the transporter launched reaches the target planet (NOT TESTED)
+    // we pass the target planet and the planet the transporter is being sent from into the method and want to return time as Double.
+    // We start by making the variable transporter in order to prevent null values in calculations.
+    // velocity is stored in transporters as .v and we pull this. Distance is the transporter's position - the targetPlanets position.
+    // We calculate euclideanDistance using the appropriate formula for distance. We use the built in magnitude function on the velocity to get the speed.
+    // We run a check for possibly getting speed == 0.0 before using it in division. Then calculate time with t = d/s and return.
+
+    fun timeToTarget(targetPlanet: Planet, transporterPlanet: Planet): Double {
+        val transporter = transporterPlanet.transporter ?: return 0.0
+        var params = GameParams()
+        var velocity = transporter.v
+        var distance = (transporter.s - targetPlanet.position)
+        //Need euclidean distance
+        var euclideanDistance = Math.sqrt(Math.pow(distance.x, 2.0) + Math.pow(distance.y, 2.0))
+        var speed = velocity.mag()
+
+        if (speed == 0.0) {
+            return 0.0
+        }
+
+        var time = euclideanDistance / speed
+        return time
+
     }
 }
