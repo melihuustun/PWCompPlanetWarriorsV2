@@ -9,22 +9,26 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
     private val halfwayLine = params.width / 2 //Get the halfway line of the game space to determine which side we are defending
 
     override fun getAction(gameState: GameState): Action { //Override getAction from original class, pass gameState in and return action.
-
-        // This agent has no random chance. Is made to choose the source as the planet with the most ships out of the ones owned.
-        // The target is to be determined by multiple arguments. We first go through all neutral planets on our side an capture any remaining, we then
-        // go through a list of all of our owned planets and find if any of the planets on our side are going to be taken over by the enemy
-        // (judged by net transporter weights being sent) we will target it with optimal amount of ships.
         //
-        // Possible issues: Multiple actions per game tick? Not accounting for transporters being sent in current action in calculations so
-        // too many transporters sent to one planet to defend still.
-        // Too slow in decision making, looks through too much, not making enough actions per tick.
-        // Need to integrate time function to work out when to send planets at an optimal time.
+        // This agent has no random chance. The strategy is based the Random DefensiveAgent.
+        // It is made to choose the source as the planet with the most ships out of the ones owned.
+        // The target is to be determined by multiple arguments.
+        // We first go through all neutral planets on our side and capture any remaining,
+        // we then go through a list of all of our owned planets and find if any of the planets on our side are going to be taken over by the enemy
+        // (judged by net transporter weights being sent to planet stored in a HashMap),
+        // we will target it with optimal amount of ships. Otherwise, we will attack
+        // an enemy planet already on our side or the nearest enemy planet.
+        //
+        // v0.2 - Faster initialisation of half and otherHalf planets for use in decision-making
+        // Changed net transporter weight storage for all planets to a hashMap system.
+        //
+        // Idea for improvement - Change to attack enemy planet with heuristic involving nShips and distance if we aren't defending.
+        // Also need to optimise nShips sent to the enemy planets too.
 
         //Define planets on our side. Defined values for half/otherHalf planets as ArrayLists to be altered.
         //Their capacity is the total planets in the game.
         val halfPlanets = ArrayList<Planet> (gameState.planets.size)
         val otherHalfPlanets = ArrayList<Planet>(gameState.planets.size)
-
         // Define a condition based on a condition. if we are player1, store the condition method onPlayerHalf
         // as position.x <= halfwayLine, otherwise, as position.x >= halfwayLine.
         val onPlayerHalf: (Planet) -> Boolean = if (player == Player.Player1) {
@@ -32,12 +36,12 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
         } else {
             {it.position.x >= halfwayLine}
         }
-
         // For all planets in the game, decide which list to put them in based on our defined condition above.
         // if true, add to halfPlanets, else, add to otherHalfPlanet.
         for (p in gameState.planets) {
             if (onPlayerHalf(p) ) { halfPlanets.add(p)} else {otherHalfPlanets.add(p)}
         }
+
 
         // Identify owned planets not currently in-action
         var myPlanets = gameState.planets.filter{ it.owner == player && it.transporter == null} //Identify planets owned by player not doing an action
@@ -47,13 +51,20 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
 
         // Identify enemy planets
         val enemyPlanets = gameState.planets.filter{it.owner == player.opponent()} //Identify planets owned by enemy
+
+
         // Identify enemy planets in-action
         val attackingEnemyPlanets = enemyPlanets.filter{it.transporter != null}
+
+        // Source planet is determined by the one with maximum number of ships.
         val source = myPlanets.maxBy{it.nShips}
+
+        // Remove source from decision-making.
         myPlanets = myPlanets.filter{it != source}
 
+        // Identify our Planets in action.
         val myAttackingPlanets = gameState.planets.filter{it.owner == player && it.transporter != null && it != source}
-        // myPlanets = myPlanets.filter{it != source}
+
 
         // AI suggested inclusion / fix
         // Create a hashmap which uses planets as keys and a default 0.0 as values.
@@ -118,7 +129,6 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
         val target = enemyOnPlayerSide.minBy{it.position.distance(source.position)}
         return Action(player, source.id, target.id, source.nShips/2)
 
-        //Return action command with appropriate collected information
 
     }
 
