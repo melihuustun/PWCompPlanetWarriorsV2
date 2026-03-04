@@ -9,20 +9,12 @@ class DefensiveRandomAgent() : PlanetWarsPlayer() { //New agent defined as subcl
 
     override fun getAction(gameState: GameState): Action { //Override getAction from original class, pass gameState in and return action.
 
-        //var myPlanets: List<Planet>
-
-        //if (gameState.gameTick > 500) {
-            //myPlanets = gameState.planets.filter{ it.owner == player && it.transporter == null && it.nShips > 5 } //Identify planets owned by player or no-one
-        //} else {
-            //myPlanets = gameState.planets.filter{ it.owner == player && it.transporter == null } //Identify planets owned by player or no-one
-        //}
-
         val myPlanets = gameState.planets.filter{ it.owner == player && it.transporter == null} //Identify planets owned by player or no-one
 
         if (myPlanets.isEmpty()) { //If no planets returned, no action
             return Action.doNothing()
         }
-        val source = myPlanets.random() //Random selection source from list of owned planets
+        var source = myPlanets.random() //Random selection source from list of owned planets
         val halfwayLine = params.width / 2 //Get the halfway line of the game space to determine which side we are defending
 
         var halfPlanets: List<Planet> //Choose halfPlanets, declared as variable to store List of Planets
@@ -54,6 +46,16 @@ class DefensiveRandomAgent() : PlanetWarsPlayer() { //New agent defined as subcl
 
         } else {
             target = halfPlanets.random() // Randomly choose target from selected list of planets on our side
+        }
+
+        if (source.nShips < target.nShips) { // If our current source planet has fewer ships than intended target
+            val betterSourcePlanets = gameState.planets.filter{it.owner == player && it.nShips > target.nShips+1 && it.transporter == null}
+            // Look for a better source planet that has more ships than the target
+            if (betterSourcePlanets.isNotEmpty()){ // If one or more exist
+                source = betterSourcePlanets.random() // Pick a random better planet
+                return Action(player, source.id, target.id, target.nShips+1)
+                // Send n+1 ships to take over the target planet
+            }
         }
 
         return Action(player, source.id, target.id, source.nShips/2)
