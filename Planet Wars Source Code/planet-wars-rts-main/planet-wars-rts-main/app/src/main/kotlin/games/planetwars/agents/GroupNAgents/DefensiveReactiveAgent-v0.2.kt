@@ -5,7 +5,7 @@ import games.planetwars.agents.PlanetWarsPlayer
 import games.planetwars.core.*
 import kotlin.math.*
 
-class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as subclass of PlanetWarsPlayer()
+class DefensiveReactiveAgent02() : PlanetWarsPlayer() { //New agent defined as subclass of PlanetWarsPlayer()
     private val halfwayLine = params.width / 2 //Get the halfway line of the game space to determine which side we are defending
 
     override fun getAction(gameState: GameState): Action { //Override getAction from original class, pass gameState in and return action.
@@ -169,7 +169,7 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
         // Want to target smallest nShips not being captured already while accounting for distance in targeting.
         // filter for p in enemy planets.
         // calc incomingNet correctly and if the net is negative, target if less than minimum found.
-        var target: Planet = otherHalfPlanets[0]
+        target = otherHalfPlanets[0]
         var targetNet: Double = netShips.getOrElse(target.id) {0.0} - target.nShips
         var targetDist: Double = target.position.distance(source.position)
         for (p in otherHalfPlanets.slice(1..enemyPlanets.lastIndex)) {
@@ -210,7 +210,7 @@ class DefensiveReactiveAgent() : PlanetWarsPlayer() { //New agent defined as sub
 }
 
     fun main() {
-    val agent = DefensiveReactiveAgent()
+    val agent = DefensiveReactiveAgent02()
     agent.prepareToPlayAs(Player.Player1, GameParams())
     val gameState = GameStateFactory(GameParams()).createGame()
     val action = agent.getAction(gameState)
