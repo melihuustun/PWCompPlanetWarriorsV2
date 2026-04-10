@@ -1,4 +1,4 @@
-package games.planetwars.agents.GroupNAgents
+package games.planetwars.agents.GroupNAgents.evo
 
 import games.planetwars.agents.evo.GameStateWrapper
 
@@ -94,15 +94,7 @@ data class AdvancedEvoAgent(
             bestSolution = ScoredSolution(evalSeq(gameState, nextSeq), nextSeq)
         }
 
-        for (i in 0 until nEvals) {
-            val mut = mutate(bestSolution!!.solution, probMutation)
-            val mutScore = evalSeq(gameState, mut)
-            if (mutScore >= bestSolution!!.score) {
-                bestSolution = ScoredSolution(mutScore, mut)
-            }
-        }
-
-        // Time-bounded extra evolution: keep mutating until the time budget runs out
+        // Time-bounded evolution: mutate and evaluate until the time budget runs out
         val startTime = System.currentTimeMillis()
         while (System.currentTimeMillis() - startTime < timeLimitMillis) {
             val mut = mutate(bestSolution!!.solution, probMutation)
