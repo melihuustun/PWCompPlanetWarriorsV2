@@ -143,6 +143,9 @@ data class AdvancedEvoAgent(
 
         val wrapper = AdvancedGameStateWrapper(gameState, params, player)
         val action = wrapper.getAction(gameState, bestSolution!!.solution[0], bestSolution!!.solution[1], bestSolution!!.solution[2])
+        if (action.numShips < 1.0) {
+            return Action.doNothing()
+        }
         return action
     }
 
