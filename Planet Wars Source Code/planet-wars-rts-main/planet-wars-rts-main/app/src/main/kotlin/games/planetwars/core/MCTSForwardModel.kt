@@ -65,7 +65,11 @@ class MCTSForwardModel(val state: GameState, val params: GameParams) {
         return state.planets.filter { it.owner == player }.sumOf { it.nShips }
     }
 
-    fun getPlanets(player: Player) : Int {
+    fun getGrowthRate(player: Player): Double {
+        return state.planets.filter { it.owner == player }.sumOf { it.growthRate }
+    }
+
+    fun getPlanets(player: Player): Int {
         return state.planets.count { it.owner == player }
     }
 
