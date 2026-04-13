@@ -20,7 +20,7 @@ class MCTSAgent() : PlanetWarsPlayer() {
     val epsilon = 1e-6
     val k = sqrt(2.0)
     val maxTreeDepth = 500
-    val maxIterations = 300
+    val maxIterations = 350
 
 
     // Future refinements:
@@ -45,23 +45,19 @@ class MCTSAgent() : PlanetWarsPlayer() {
         if (myPlanets.isEmpty()) {
             return actions
         }
-        // Ideas for pruning search space - once number of possible sources exceeds 10, pick from 5 with highest ships to send from
-        if (myPlanets.size >= 10) {
-            myPlanets = myPlanets.sortedByDescending{it.nShips}.take(5)
-        }
+
         var targetPlanets = gameState.planets.filter { it.owner == player.opponent() || it.owner == Player.Neutral }
         if (targetPlanets.isEmpty()) {
             return actions
         }
-        // Same idea for opponent planets - once number of possible targets exceeds 10, pick from 5 weakest potential targets
-        if (targetPlanets.size >= 10) {
-            targetPlanets = targetPlanets.sortedBy { it.nShips }.take(5)
-         }
 
+        val shipValues = mutableListOf(0.5, 0.75)
 
         for (source in myPlanets) {
             for (target in targetPlanets) {
-                actions.add(Action(player, source.id, target.id, source.nShips/2))
+                for (fract in shipValues) {
+                    actions.add(Action(player, source.id, target.id, source.nShips * fract))
+                }
             }
         }
         return actions
