@@ -25,12 +25,15 @@ data class FinalGameStateWrapper(
     val player: Player,
     val opponentModel: PlanetWarsAgent = DoNothingAgent(),
     val initialModel: PlanetWarsAgent = DoNothingAgent(),
+    var enemyGrowthRateWeight: Double = 1.0,
 ) {
     var forwardModel = AdvancedForwardModel(gameState, params)
 
     companion object {
         // nShips is also included in forward model being used
         val shiftBy = 3
+        //private const val MIN_ACTION_SHIPS_EPS = 1e-9
+        private const val MIN_ACTION_SHIPS_EPS = 0.0
     }
 
     fun getAction(gameState: GameState, from: Float, to: Float, numShips: Float = 0.5f): Action {
@@ -47,7 +50,12 @@ data class FinalGameStateWrapper(
         }
         val source = myPlanets[(from * myPlanets.size).toInt()]
         val target = otherPlanets[(to * otherPlanets.size).toInt()]
-        return Action(player, source.id, target.id, source.nShips * numShips)
+        val shipsToSend = source.nShips * numShips
+        // Treat non-positive launches as explicit no-ops so they do not consume the source transporter slot.
+        if (shipsToSend <= MIN_ACTION_SHIPS_EPS) {
+            return Action.doNothing()
+        }
+        return Action(player, source.id, target.id, shipsToSend)
     }
 
     fun runForwardModel(seq: FloatArray): Double {
@@ -57,8 +65,15 @@ data class FinalGameStateWrapper(
             val from = seq[ix]
             val to = seq[ix + 1]
             val nShips = seq[ix + 2]
-            // The gameState is taken from the forward model to allow for dynamic reactive gameplay
-            val myAction = getAction(forwardModel.state, from, to, nShips)
+
+            var myAction = Action.doNothing()
+            if (from == -1f || to == -1f || nShips == -1f) {
+                myAction = Action.doNothing()
+            }
+            else {
+                // The gameState is taken from the forward model to allow for dynamic reactive gameplay
+                myAction = getAction(forwardModel.state, from, to, nShips)
+            }
             val opponentAction = opponentModel.getAction(forwardModel.state)
             val actions = mapOf(player to myAction, player.opponent() to opponentAction)
             forwardModel.step(actions)
@@ -77,8 +92,8 @@ data class FinalGameStateWrapper(
             val playerAction = initialModel.getAction(forwardModel.state.deepCopy())
             val opponentAction = opponentModel.getAction(forwardModel.state.deepCopy())
 
-            val myPlanets = gameState.planets.filter { it.owner == player && it.transporter == null }
-            val otherPlanets = gameState.planets.filter { it.owner == player.opponent() || it.owner == Player.Neutral }
+            val myPlanets = forwardModel.state.planets.filter { it.owner == player && it.transporter == null }
+            val otherPlanets = forwardModel.state.planets.filter { it.owner == player.opponent() || it.owner == Player.Neutral }
 
 
             var from = 0
@@ -88,23 +103,34 @@ data class FinalGameStateWrapper(
             //val target = otherPlanets[(to * otherPlanets.size).toInt()]
             for (i in 0 until myPlanets.size) {
                 if (playerAction.sourcePlanetId == myPlanets[i].id) {
-                    from = i / myPlanets.size
+                    from = i
                 }
             }
             for (i in 0 until otherPlanets.size) {
                 if (playerAction.destinationPlanetId == otherPlanets[i].id) {
-                    to = i / otherPlanets.size
+                    to = i
                 }
             }
 
-            p[ix] = from.toFloat()
-            p[ix + 1] = to.toFloat()
-            p[ix + 2] = playerAction.numShips.toFloat()
+            val sourcePlanet = forwardModel.state.planets.find { it.id == playerAction.sourcePlanetId }
+            var nShipsFraction = if (sourcePlanet != null && sourcePlanet.nShips > 0.0 && playerAction != Action.doNothing()) {
+                (playerAction.numShips / sourcePlanet.nShips).toFloat().coerceIn(0.01f, 1.0f)
+            } else {
+                -1f
+            }
+
+            //if (nShipsFraction < 0.05) {
+            //    nShipsFraction = 0.5f
+            //}
+
+            p[ix] = if (myPlanets.isNotEmpty()) from.toFloat() / myPlanets.size else -1f
+            p[ix + 1] = if (otherPlanets.isNotEmpty()) to.toFloat() / otherPlanets.size else -1f
+            p[ix + 2] = nShipsFraction
             ix += shiftBy
 
             val actions = mapOf(
-                Player.Player1 to playerAction,
-                Player.Player2 to opponentAction,
+                player to playerAction,
+                player.opponent() to opponentAction,
             )
             forwardModel.step(actions)
         }
@@ -118,23 +144,28 @@ data class FinalGameStateWrapper(
     }
 
     fun growthRateDifference(): Double {
-        return forwardModel.getGrowthRate(player) - forwardModel.getGrowthRate(player.opponent())
+        return forwardModel.getGrowthRate(player) - enemyGrowthRateWeight * forwardModel.getGrowthRate(player.opponent())
+    }
+
+    fun growthRate(): Double {
+        return forwardModel.getGrowthRate(player)
     }
 }
 
 data class FinalAgent(
     var flipAtLeastOneValue: Boolean = true,
-    var probMutation: Double = 0.5,
+    var probMutation: Double = 0.45,
     //var sequenceLength: Int = 200,
-    var sequenceLength: Int = 600,
+    var sequenceLength: Int = 450,
     var nEvals: Int = 20,
     var useShiftBuffer: Boolean = true,
     var epsilon: Double = 1e-6,
     var timeLimitMillis: Long = 20,
     var opponentModel: PlanetWarsAgent = DoNothingAgent(),
     var initialModel: PlanetWarsAgent = DefensiveReactiveAgent10(),
+    var secondModel: PlanetWarsAgent = CarefulRandomAgent(),
     var economyWeight: Double = 75.0,
-    var ecoWeight: Double = economyWeight,
+    var economyWeight2: Double = 0.2,
     var secondPart: Double = 0.35,
 
     ) : PlanetWarsPlayer() {
@@ -142,10 +173,14 @@ data class FinalAgent(
         return "FinalAgent-$sequenceLength-$nEvals-$probMutation-$useShiftBuffer"
     }
 
+    var initialReModeled = false
+
     // neutral bug fixed by preparing the enemy agent
     override fun prepareToPlayAs(player: Player, params: GameParams, opponent: String?): String {
         super.prepareToPlayAs(player, params, opponent)
         opponentModel.prepareToPlayAs(player.opponent(), params, opponent)
+        initialModel.prepareToPlayAs(player, params, opponent)
+        secondModel.prepareToPlayAs(player, params, opponent)
         return getAgentType()
     }
 
@@ -163,26 +198,45 @@ data class FinalAgent(
 
         // start timer
         val startTime = System.currentTimeMillis()
+        var ecoWeight: Double = economyWeight
 
-        var inSecondPart = false
-
-        if (inSecondPart || gameState.gameTick + sequenceLength * 0.5 > params.maxTicks * secondPart) {
-            ecoWeight = economyWeight * 0.3
-            inSecondPart = true
+        if (gameState.gameTick + sequenceLength / 3 > params.maxTicks * secondPart) {
+            ecoWeight = economyWeight * economyWeight2
         }
 
         if (bestSolution == null || !useShiftBuffer) {
-            val solution = initialPoint(gameState)
+            val solution = initialPoint(gameState, initialModel)
             val scores = evalSeq(gameState, solution)
             bestSolution = ScoredSolution(scores.score + ecoWeight * scores.growthRate, solution)
         } else {
             val nextSeq = shiftLeftAndRandomAppend(bestSolution!!.solution, FinalGameStateWrapper.shiftBy)
             val scores = evalSeq(gameState, nextSeq)
             bestSolution = ScoredSolution(scores.score + ecoWeight * scores.growthRate, nextSeq)
+
+            if (gameState.gameTick % 80 == 0) {
+                val mut1 = initialPoint(gameState, initialModel)
+                val scores1 = evalSeq(gameState, mut1)
+                val mutScore1 = scores1.score + ecoWeight * scores1.growthRate
+                if (mutScore1 >= bestSolution!!.score) {
+                    bestSolution = ScoredSolution(mutScore1, mut1)
+                }
+            }
+            //else if (gameState.gameTick % 40 == 20) {
+            //    val mut1 = initialPoint(gameState, secondModel)
+            //    val scores1 = evalSeq(gameState, mut1)
+            //    val mutScore1 = scores1.score + ecoWeight * scores1.growthRate
+            //    if (mutScore1 >= bestSolution!!.score) {
+            //        bestSolution = ScoredSolution(mutScore1, mut1)
+            //    }
+            //}
+        }
+
+        if (bestSolution!!.solution[0] == -1f || bestSolution!!.solution[1] == -1f || bestSolution!!.solution[2] == -1f) {
+            return Action.doNothing()
         }
 
         // Time-bounded evolution: mutate and evaluate until the time budget runs out
-        while (System.currentTimeMillis() - startTime < timeLimitMillis) {
+        while (gameState.gameTick > gameState.planets.filter { it.owner == player }.size * 0 && System.currentTimeMillis() - startTime < timeLimitMillis) {
             //println(System.currentTimeMillis() - startTime)
             val mut = mutate(bestSolution!!.solution, probMutation)
             val scores = evalSeq(gameState, mut)
@@ -193,6 +247,11 @@ data class FinalAgent(
         }
 
         val wrapper = FinalGameStateWrapper(gameState, params, player)
+        //val numShipsFraction = bestSolution!!.solution[2].coerceAtLeast(0.3f)
+        //val action = wrapper.getAction(gameState, bestSolution!!.solution[0], bestSolution!!.solution[1], numShipsFraction)
+        //if (bestSolution!!.solution[2] < 0.1) {
+        //    return Action.doNothing()
+        //}
         val action = wrapper.getAction(gameState, bestSolution!!.solution[0], bestSolution!!.solution[1], bestSolution!!.solution[2])
         return action
     }
@@ -211,7 +270,8 @@ data class FinalAgent(
         }
         // copy all the values faithfully apart from the chosen one
         for (i in 0 until n) {
-            if (i == ix || random.nextDouble() < mutProb) {
+            //if (i == ix || random.nextDouble() < mutProb) {
+            if (i == ix || random.nextDouble() < mutProb * ((n.toDouble() -  i.toDouble()) / n.toDouble())) {
                 x[i] = random.nextFloat()
             } else {
                 x[i] = v[i]
@@ -229,10 +289,10 @@ data class FinalAgent(
     //    return p
     //}
 
-    private fun initialPoint(gameState: GameState): FloatArray {
+    private fun initialPoint(gameState: GameState, model: PlanetWarsAgent): FloatArray {
         //val p = FloatArray(sequenceLength)
         //var forwardModel = AdvancedForwardModel(gameState.deepCopy(), params)
-        val wrapper = FinalGameStateWrapper(gameState, params, player, initialModel = initialModel)
+        val wrapper = FinalGameStateWrapper(gameState, params, player, initialModel = model)
         val init = wrapper.initialForwardModel(sequenceLength)
         val p = init.p
         val length = init.length
@@ -266,6 +326,7 @@ data class FinalAgent(
         wrapper.runForwardModel(seq)
         val score = wrapper.scoreDifference()
         val growthRate = wrapper.growthRateDifference()
+        //val growthRate = wrapper.growthRate()
         return EvalResults(score, growthRate)
     }
 }
