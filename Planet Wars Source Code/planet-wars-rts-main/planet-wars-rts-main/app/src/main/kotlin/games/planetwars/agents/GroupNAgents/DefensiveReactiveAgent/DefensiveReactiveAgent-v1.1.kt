@@ -28,6 +28,12 @@ class DefensiveReactiveAgent11() : PlanetWarsPlayer() { // New agent defined as 
 
     private var distances: Array<DoubleArray>? = null //Declare property distances
 
+    // Constant parameter values for heuristic scores
+    private val TOP_SOURCE_RATIO: Double = 0.2
+    private val DEFENCE_GROWTH_RATE: Double = 0.7
+    private val NEUTRAL_DISTANCE_WEIGHT: Double = 0.8
+    private val ENEMY_DISTANCE_WEIGHT: Double = 0.4
+    private val SMALL_SOURCE_TICK_DIVISOR: Double = 5.0
     // Data class defines a storage class. This is going to be used to store information on the planets/ships attacking
     // a specific planet.
     private data class IncomingShipsInfo(
@@ -223,7 +229,7 @@ class DefensiveReactiveAgent11() : PlanetWarsPlayer() { // New agent defined as 
     // Heuristic for choosing a source when defending
     private fun getSourceHeuristicValue(source: Planet, target: Planet, netShips: Double): Double {
         val d = getDist(source, target)
-        return d / (netShips * (source.growthRate*0.7))
+        return d / (netShips * (source.growthRate*DEFENCE_GROWTH_RATE))
     }
 
     // Full encoding for attacking a planet
@@ -242,9 +248,9 @@ class DefensiveReactiveAgent11() : PlanetWarsPlayer() { // New agent defined as 
 
         // We want to find a small list of our optimal sources.
         // We use our list of possible source planets, sorted by descending order using the nShips values. Out of this list,
-        // we take a dynamic amount, being the size of the full list * 0.3. (+1 is used to avoid a value of 0)
+        // we take a dynamic amount, being the size of the full list * a constant. (+1 is used to avoid a value of 0)
         val optimalSources: List<Planet> =
-            mySourcePlanets.sortedByDescending { it.nShips }.take(max(1, ((mySourcePlanets.size * 0.3).toInt() + 1)))
+            mySourcePlanets.sortedByDescending { it.nShips }.take(max(1, ((mySourcePlanets.size * TOP_SOURCE_RATIO).toInt() + 1)))
 
         // Now we collect our action. Returned via the appropriate method which takes our list of sources and targets.
         var act = attackPlanetWithSource(planetsToAttack, optimalSources, planetInfo)
@@ -253,7 +259,7 @@ class DefensiveReactiveAgent11() : PlanetWarsPlayer() { // New agent defined as 
         // source.nShips/2, and this value is a small amount (worked out dynamically), then we shouldn't waste our small
         // planet's ships.
         if (act.numShips == source.nShips / 2) {
-            if (source.nShips <= (source.growthRate * (params.maxTicks / 12))) {
+            if (source.nShips <= (source.growthRate * (params.maxTicks / SMALL_SOURCE_TICK_DIVISOR))) {
                 act = Action.doNothing()
             }
         }
@@ -310,9 +316,9 @@ class DefensiveReactiveAgent11() : PlanetWarsPlayer() { // New agent defined as 
     // if it is neutral, we also look at the growthRate to see the value of the neutral planet.
     private fun getHeuristicValue(netShips: Double, distance: Double, target:Planet): Double {
         return if (target.owner == Player.Neutral) {
-            (netShips + (distance * 0.5)) / (target.growthRate+1)
+            (netShips + (distance * NEUTRAL_DISTANCE_WEIGHT)) / (target.growthRate+1)
         } else {
-            netShips + (distance*0.45)
+            netShips + (distance*ENEMY_DISTANCE_WEIGHT)
         }
     }
 
