@@ -161,7 +161,7 @@ data class PlanetWarriorV2(
     var nEvals: Int = 20,
     var useShiftBuffer: Boolean = true,
     var epsilon: Double = 1e-6,
-    var timeLimitMillis: Long = 48,
+    var timeLimitMillis: Long = 20,
     var opponentModel: PlanetWarsAgent = DoNothingAgent(),
     var initialModel: PlanetWarsAgent = DefensiveReactiveAgent11(),
     var secondModel: PlanetWarsAgent = CarefulRandomAgent(),
