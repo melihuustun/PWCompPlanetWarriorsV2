@@ -88,7 +88,9 @@ tasks.named("check") {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21) // Java 21 LTS - best compatibility
+        // Must match the Java version used in the competition Dockerfile runtime.
+        // The provided Dockerfile uses Eclipse Temurin 20.
+        languageVersion = JavaLanguageVersion.of(20)
     }
 }
 
@@ -97,7 +99,7 @@ application {
 }
 
 kotlin {
-    jvmToolchain(21) // Ensure Kotlin targets JVM 21 as well
+    jvmToolchain(20) // Ensure Kotlin targets JVM 20 as well
 }
 
 tasks.register<JavaExec>("runEvaluation") {
